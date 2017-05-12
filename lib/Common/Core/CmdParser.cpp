@@ -65,7 +65,7 @@ CmdLineArgsParser::ParseString(__inout_ecount(ceBuffer) LPWSTR buffer, size_t ce
         {
             switch(CurChar())
             {
-            case ' ':
+            // case ' ':
             case ',':
             case 0:
                 fDone = 1;

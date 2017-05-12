@@ -312,7 +312,7 @@ HRESULT RunScript(const char* fileName, LPCSTR fileContents, JsFinalizeCallback 
 
     IfJsErrorFailLogLabel(ChakraRTInterface::JsSetPromiseContinuationCallback(WScriptJsrt::PromiseContinuationCallback, (void*)messageQueue), ErrorRunFinalize);
 
-    if(strlen(fileName) >= 14 && strcmp(fileName + strlen(fileName) - 14, "ttdSentinal.js") == 0)
+    if(!HostConfigFlags::flags.evalIsEnabled && strlen(fileName) >= 14 && strcmp(fileName + strlen(fileName) - 14, "ttdSentinal.js") == 0)
     {
         if(fileContentsFinalizeCallback != nullptr)
         {
@@ -595,7 +595,7 @@ HRESULT ExecuteTest(const char* fileName)
     JsRuntimeHandle runtime = JS_INVALID_RUNTIME_HANDLE;
     UINT lengthBytes = 0;
 
-    if(strlen(fileName) >= 14 && strcmp(fileName + strlen(fileName) - 14, "ttdSentinal.js") == 0)
+    if(!HostConfigFlags::flags.evalIsEnabled && strlen(fileName) >= 14 && strcmp(fileName + strlen(fileName) - 14, "ttdSentinal.js") == 0)
     {
 #if !ENABLE_TTD
         wprintf(_u("Sentinel js file is only ok when in TTDebug mode!!!\n"));
@@ -631,8 +631,16 @@ HRESULT ExecuteTest(const char* fileName)
         char fullPath[_MAX_PATH];
         size_t len = 0;
 
-        hr = Helpers::LoadScriptFromFile(fileName, fileContents, &lengthBytes);
-        contentsRaw; lengthBytes; // Unused for now.
+        if(HostConfigFlags::flags.evalIsEnabled)
+        {
+            wprintf(_u("%s\n"), HostConfigFlags::flags.eval);
+            hr = WideStringToNarrowDynamic(HostConfigFlags::flags.eval, const_cast<LPSTR *>(&fileContents));
+        }
+        else
+        {
+            hr = Helpers::LoadScriptFromFile(fileName, fileContents, &lengthBytes);
+            contentsRaw; lengthBytes; // Unused for now.
+        }
 
         IfFailGo(hr);
         if (HostConfigFlags::flags.GenerateLibraryByteCodeHeaderIsEnabled)
@@ -706,17 +714,28 @@ HRESULT ExecuteTest(const char* fileName)
             IfFailGo(E_FAIL);
         }
 
-        if (_fullpath(fullPath, fileName, _MAX_PATH) == nullptr)
+        if (!HostConfigFlags::flags.evalIsEnabled)
         {
-            IfFailGo(E_FAIL);
-        }
+            if(_fullpath(fullPath, fileName, _MAX_PATH) == nullptr)
+            {
+                IfFailGo(E_FAIL);
+            }
 
-        // canonicalize that path name to lower case for the profile storage
-        // REVIEW: Assuming no utf8 characters here
-        len = strlen(fullPath);
-        for (size_t i = 0; i < len; i++)
+            // canonicalize that path name to lower case for the profile storage
+            // REVIEW: Assuming no utf8 characters here
+            len = strlen(fullPath);
+            for (size_t i = 0; i < len; i++)
+            {
+                fullPath[i] = (char)tolower(fullPath[i]);
+            }
+        }
+        else 
         {
-            fullPath[i] = (char)tolower(fullPath[i]);
+            len = strlen(fullPath);
+            for (size_t i = 0; i < len; i++)
+            {
+                fullPath[i] = (char)NULL;
+            }
         }
 
         if (HostConfigFlags::flags.GenerateLibraryByteCodeHeaderIsEnabled)
@@ -738,6 +757,10 @@ HRESULT ExecuteTest(const char* fileName)
         else if (HostConfigFlags::flags.SerializedIsEnabled)
         {
             CreateAndRunSerializedScript(fileName, fileContents, WScriptJsrt::FinalizeFree, fullPath);
+        }
+        else if (HostConfigFlags::flags.evalIsEnabled)
+        {
+            IfFailGo(RunScript(NULL, fileContents, WScriptJsrt::FinalizeFree, nullptr, fullPath));
         }
         else
         {
@@ -1043,7 +1066,7 @@ int _cdecl wmain(int argc, __in_ecount(argc) LPWSTR argv[])
     OnChakraCoreLoaded(OnChakraCoreLoadedEntry);
 #endif
 
-    if (argInfo.filename == nullptr)
+    if (!HostConfigFlags::flags.evalIsEnabled && argInfo.filename == nullptr)
     {
         WideStringToNarrowDynamic(argv[1], &argInfo.filename);
     }

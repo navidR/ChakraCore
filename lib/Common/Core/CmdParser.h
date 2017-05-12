@@ -26,7 +26,7 @@ class CmdLineArgsParser : private ICmdLineArgsParser
 {
 // Data
 private:
-    static const int  MaxTokenSize  = 512;
+    static const int  MaxTokenSize  = 8192;
 
     Js::ConfigFlagsTable& flagTable;
     LPWSTR           pszCurrentArg;
